@@ -45,3 +45,16 @@ func (c *Client) UserProfile() (map[string]any, error) {
 func (c *Client) Margins() (map[string]any, error) {
 	return nil, nil
 }
+
+func (c *Client) Orders() error {
+
+	return nil
+}
+
+func (c *Client) Positions() error {
+	return nil
+}
+
+func (c *Client) TradeBook() error {
+	return nil
+}
