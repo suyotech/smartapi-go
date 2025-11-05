@@ -46,7 +46,7 @@ func NewClient(clientId, mpin, apiKey, totpKey string) *Client {
 }
 
 type serverResponse[T any] struct {
-	Status    string `json:"status"`
+	Status    bool   `json:"status"`
 	Message   string `json:"message"`
 	ErrorCode string `json:"errorcode"`
 	Data      T      `json:"data"`
@@ -121,7 +121,7 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	}
 
 	// Check for errors in server response
-	if serverResp.Status != "success" {
+	if !serverResp.Status {
 		return fmt.Errorf("API error: %s (code: %s)", serverResp.Message, serverResp.ErrorCode)
 	}
 

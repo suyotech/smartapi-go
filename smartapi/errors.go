@@ -25,12 +25,14 @@ var apiErrorMessages = map[string]string{
 	"AB1016": "Position not found",
 	"AB1017": "Position conversion failed",
 	"AB1018": "Failed to get symbol details",
+	"AB1050": "Invalid TOTP",
 	"AB2000": "Error not specified",
 	"AB2001": "Internal Error, Please try after sometime",
 	"AB1031": "Old Password Mismatch",
 	"AB1032": "User Not Found",
 	"AB2002": "ROBO order is block",
 	"AB4008": "ordertag length should be less than 20 characters",
+	"AG7002": "Unregistered IP Address",
 }
 
 func getAPIErrorMessage(errorCode string) string {
