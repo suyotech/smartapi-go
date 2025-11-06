@@ -2,7 +2,6 @@ package smartapi
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/pquerna/otp/totp"
@@ -71,7 +70,7 @@ func (c *Client) GenerateSession() error {
 		return err
 	}
 
-	log.Printf("Login Response %+v", lr)
+	// log.Printf("Login Response %+v", lr)
 
 	c.SetTokens(lr.JWTToken, lr.RefreshToken, lr.FeedToken)
 
