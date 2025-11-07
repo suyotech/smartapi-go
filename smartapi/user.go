@@ -2,7 +2,6 @@ package smartapi
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/pquerna/otp/totp"
@@ -71,8 +70,6 @@ func (c *Client) GenerateSession() error {
 		return err
 	}
 
-	log.Printf("Login Response %+v", lr)
-
 	c.SetTokens(lr.JWTToken, lr.RefreshToken, lr.FeedToken)
 
 	return nil
@@ -106,4 +103,21 @@ func (c *Client) UserMargin() (*UserMarginResponse, error) {
 	}
 
 	return margin, nil
+}
+
+func (c *Client) Logout() error {
+
+	type logoutReq struct {
+		ClientCode string `json:"clientcode"`
+	}
+
+	lr := logoutReq{
+		ClientCode: c.ClientId,
+	}
+	err := c.doRequest("POST", LOGOUT_ENDPOINT, lr, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

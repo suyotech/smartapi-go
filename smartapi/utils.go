@@ -29,8 +29,6 @@ func publicIP() string {
 		if err == nil {
 			ip := strings.TrimSpace(string(body))
 			if ip != "" {
-
-				log.Println("Public IP", ip)
 				return ip
 			}
 		}

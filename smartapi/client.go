@@ -20,6 +20,7 @@ type Client struct {
 	localIP      string
 	publicIP     string
 	macID        string
+	debug        bool
 	httpClient   *http.Client
 }
 
@@ -41,6 +42,7 @@ func NewClient(clientId, mpin, apiKey, totpKey string) *Client {
 		publicIP:     publicIP(),
 		macID:        macID(),
 		baseUrl:      BASE_URL,
+		debug:        false,
 		httpClient:   httpClient,
 	}
 }
@@ -52,8 +54,8 @@ type serverResponse[T any] struct {
 	Data      T      `json:"data"`
 }
 
-func (c *Client) SetBaseUrl(url string) {
-	c.baseUrl = url
+func (c *Client) SetDebug(debug bool) {
+	c.debug = debug
 }
 
 func (c *Client) doRequest(method string, path string, body any, result any) error {
@@ -64,17 +66,19 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	// Prepare body
 	var bodyReader io.Reader
 	if body != nil {
-		// If caller passed an io.Reader, allow that through
-		switch v := body.(type) {
-		case io.Reader:
-			bodyReader = v
-		default:
-			b, err := json.Marshal(body)
-			if err != nil {
-				return fmt.Errorf("failed to marshal request body: %w", err)
-			}
-			bodyReader = bytes.NewReader(b)
+		b, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
 		}
+		bodyReader = bytes.NewReader(b)
+		if c.debug {
+			fmt.Printf("[DEBUG] Request Body: %s\n", string(b))
+		}
+
+	}
+
+	if c.debug {
+		fmt.Printf("[DEBUG] Request: %s %s\n", method, url)
 	}
 
 	req, err := http.NewRequest(method, url, bodyReader)
@@ -97,6 +101,13 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 		req.Header.Set("Authorization", "Bearer "+c.JWTToken)
 	}
 
+	if c.debug {
+		fmt.Printf("[DEBUG] Request Headers:\n")
+		for k, v := range req.Header {
+			fmt.Printf("  %s: %v\n", k, v)
+		}
+	}
+
 	// Execute request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -104,10 +115,19 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	}
 	defer resp.Body.Close()
 
+	if c.debug {
+		fmt.Printf("[DEBUG] Response Request: %+v\n", resp.Request)
+	}
+
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if c.debug {
+		fmt.Printf("[DEBUG] Response Status: %s\n", resp.Status)
+		fmt.Printf("[DEBUG] Response Body: %s\n", string(respBody))
 	}
 
 	var serverResp serverResponse[json.RawMessage]
@@ -133,6 +153,10 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	// Decode JSON into provided result pointer
 	if err := json.Unmarshal(serverResp.Data, result); err != nil {
 		return fmt.Errorf("failed to unmarshal response JSON: %w; raw: %s", err, string(respBody))
+	}
+
+	if c.debug {
+		fmt.Printf("[DEBUG] Decoded Result: %+v\n\n\n", result)
 	}
 
 	return nil
