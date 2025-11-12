@@ -3,6 +3,7 @@ package instruments
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -22,6 +23,17 @@ type Instrument struct {
 	Exchange       string `json:"exch_seg"`
 	TickSize       string `json:"tick_size"`
 }
+
+const (
+	INTTYPE_EQ     = ""       // Equity
+	INTTYPE_INDEX  = "AMXIDX" // Index
+	INTTYPE_FUTIDX = "FUTIDX" // Future Index
+	INTTYPE_FUTSTX = "FUTSTX" // Future Stock
+	INTTYPE_OPTIDX = "OPTIDX" // Option Index
+	INTTYPE_OPTSTX = "OPTSTX" // Option Stock
+	INTTYPE_FUTCOM = "FUTCOM" // Future Commodity
+	INTTYPE_OPTFUT = "OPTFUT" // Option Future
+)
 
 func DownloadInstruments() error {
 	resp, err := http.Get("https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json")
@@ -140,19 +152,43 @@ func FindInstruments(req FindInstrumentRequest, instruments []Instrument) ([]Ins
 			results = append(results, inst)
 		}
 	}
+
+	// If results have expiry, sort by expiry date ascending
+	hasExpiry := false
+	for _, inst := range results {
+		if inst.Expiry != "" {
+			hasExpiry = true
+			break
+		}
+	}
+	if hasExpiry {
+		sort.Slice(results, func(i, j int) bool {
+			ti, erri := time.Parse("02Jan2006", strings.ToUpper(results[i].Expiry))
+			tj, errj := time.Parse("02Jan2006", strings.ToUpper(results[j].Expiry))
+			if erri != nil && errj != nil {
+				return results[i].Expiry < results[j].Expiry
+			}
+			if erri != nil {
+				return false
+			}
+			if errj != nil {
+				return true
+			}
+			return ti.Before(tj)
+		})
+	}
+
 	return results, nil
 }
 
 type OptionStrikes struct {
-	ATM float64   `json:"atm"`
-	ITM []float64 `json:"itm"`
-	OTM []float64 `json:"otm"`
+	NEAR float64   `json:"near"`
+	UP   []float64 `json:"up"`
+	DOWN []float64 `json:"down"`
 }
 
-func GetOptionStrikes(price float64, req FindInstrumentRequest, instruments []Instrument) (strikes OptionStrikes, err error) {
-
+func GetOptionStrikes(price float64, req FindInstrumentRequest, maxStrikes int, instruments []Instrument) (strikes OptionStrikes, err error) {
 	if instruments == nil {
-		var err error
 		instruments, err = LoadInstruments()
 		if err != nil {
 			return strikes, err
@@ -163,17 +199,59 @@ func GetOptionStrikes(price float64, req FindInstrumentRequest, instruments []In
 	if err != nil {
 		return strikes, err
 	}
-	strikeSet := make(map[float64]Instrument)
+
+	var strikesSet = make(map[float64]bool)
+
 	for _, inst := range foundInstruments {
-		strikeValue, err := strconv.ParseFloat(inst.Strike, 64)
-		strikeDiff := (strikeValue) / 100
-		if err == nil {
-			strikeSet[strikeDiff] = inst
+		if inst.Strike != "" {
+			strikeValue, err := strconv.ParseFloat(inst.Strike, 64)
+			if err == nil {
+				strikesSet[strikeValue] = true
+			}
 		}
 	}
 
-	// Logic to determine ATM, ITM, and OTM strikes based on the price and request
-	// This is a placeholder implementation
+	var strikeValues []float64
+	for strike := range strikesSet {
+		strikeValues = append(strikeValues, strike/100.0) // Convert to actual price
+	}
+
+	sort.Float64s(strikeValues)
+
+	//Find the nearest strike
+	nearestStrike := strikeValues[0]
+	minDiff := math.MaxFloat64
+	for _, strike := range strikeValues {
+		diff := math.Abs(price - strike)
+		if diff < minDiff {
+			minDiff = diff
+			nearestStrike = strike
+		}
+	}
+
+	strikes.NEAR = nearestStrike
+
+	strikes.UP = []float64{}
+	strikes.DOWN = []float64{}
+
+	// Collect maxStrikes strikes above and below nearestStrike
+	strikes.UP = []float64{}
+	strikes.DOWN = []float64{}
+
+	//Collect up strikes
+	for _, strike := range strikeValues {
+		if strike > nearestStrike && len(strikes.UP) < maxStrikes {
+			strikes.UP = append(strikes.UP, strike)
+		}
+	}
+
+	//Collect down strikes in reverse order
+	for i := len(strikeValues) - 1; i >= 0; i-- {
+		strike := strikeValues[i]
+		if strike < nearestStrike && len(strikes.DOWN) < maxStrikes {
+			strikes.DOWN = append(strikes.DOWN, strike)
+		}
+	}
 
 	return strikes, nil
 }
@@ -187,11 +265,14 @@ func GetExpiryDates(req FindInstrumentRequest, instruments []Instrument) ([]stri
 		}
 	}
 
+	foundInstruments, err := FindInstruments(req, instruments)
+	if err != nil {
+		return nil, err
+	}
+
 	expiryMap := make(map[string]struct{})
-	for _, inst := range instruments {
-		if inst.Symbol == req.Symbol && inst.Exchange == req.Exchange {
-			expiryMap[inst.Expiry] = struct{}{}
-		}
+	for _, inst := range foundInstruments {
+		expiryMap[inst.Expiry] = struct{}{}
 	}
 
 	var expiryDates []time.Time
