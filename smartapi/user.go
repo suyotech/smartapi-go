@@ -53,7 +53,7 @@ func (c *Client) GenerateSession() error {
 
 	totp, err := totp.GenerateCode(c.TOTPKey, time.Now())
 	if err != nil {
-		return fmt.Errorf("Error Generating TOTP %s", err.Error())
+		return fmt.Errorf("error generating TOTP %s", err.Error())
 	}
 
 	var loginReq = loginRequest{
