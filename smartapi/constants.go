@@ -4,18 +4,21 @@ import "time"
 
 //Endpoints constants
 const (
-	BASE_URL              = "https://apiconnect.angelone.in"
-	REQUEST_TIMEOUT       = 30 * time.Second
-	LOGIN_ENDPOINT        = "/rest/auth/angelbroking/user/v1/loginByPassword"
-	USER_PROFILE_ENDPOINT = "/rest/secure/angelbroking/user/v1/getProfile"
-	MARGIN_ENDPOINT       = "/rest/secure/angelbroking/user/v1/getRMS"
-	LOGOUT_ENDPOINT       = "/rest/secure/angelbroking/user/v1/logout"
-	PLACE_ORDER_ENDPOINT  = "/rest/secure/angelbroking/order/v1/placeOrder"
-	MODITY_ORDER_ENDPOINT = "/rest/secure/angelbroking/order/v1/modifyOrder"
-	CANCEL_ORDER_ENDPOINT = "/rest/secure/angelbroking/order/v1/cancelOrder"
-	ORDER_BOOK_ENDPOINT   = "/rest/secure/angelbroking/order/v1/getOrderBook"
-	TRADE_BOOK_ENDPOINT   = "/rest/secure/angelbroking/order/v1/getTradeBook"
-	POSITIONS_ENDPOINT    = "/rest/secure/angelbroking/portfolio/v1/positions"
+	BASE_URL                  = "https://apiconnect.angelone.in"
+	REQUEST_TIMEOUT           = 30 * time.Second
+	LOGIN_ENDPOINT            = "/rest/auth/angelbroking/user/v1/loginByPassword"
+	USER_PROFILE_ENDPOINT     = "/rest/secure/angelbroking/user/v1/getProfile"
+	MARGIN_ENDPOINT           = "/rest/secure/angelbroking/user/v1/getRMS"
+	LOGOUT_ENDPOINT           = "/rest/secure/angelbroking/user/v1/logout"
+	PLACE_ORDER_ENDPOINT      = "/rest/secure/angelbroking/order/v1/placeOrder"
+	MODITY_ORDER_ENDPOINT     = "/rest/secure/angelbroking/order/v1/modifyOrder"
+	CANCEL_ORDER_ENDPOINT     = "/rest/secure/angelbroking/order/v1/cancelOrder"
+	ORDER_BOOK_ENDPOINT       = "/rest/secure/angelbroking/order/v1/getOrderBook"
+	TRADE_BOOK_ENDPOINT       = "/rest/secure/angelbroking/order/v1/getTradeBook"
+	POSITIONS_ENDPOINT        = "/rest/secure/angelbroking/portfolio/v1/positions"
+	HOLDINGS_ENDPOINT         = "/rest/secure/angelbroking/portfolio/v1/holdings"
+	CONVERT_POSITION_ENDPOINT = "/rest/secure/angelbroking/portfolio/v1/convertPosition"
+	CANDLE_DATA_ENDPOINT      = "/rest/secure/angelbroking/historical/v1/getCandleData"
 )
 
 //Order related constants
@@ -41,4 +44,12 @@ const (
 	EXCHANGE_CDS               = "CDS"
 	EXCHANGE_MCX               = "MCX"
 	EXCHANGE_NFO               = "NFO"
+	INTERVAL_1MIN              = "ONE_MINUTE"
+	INTERVAL_3MIN              = "THREE_MINUTE"
+	INTERVAL_5MIN              = "FIVE_MINUTE"
+	INTERVAL_10MIN             = "TEN_MINUTE"
+	INTERVAL_15MIN             = "FIFTEEN_MINUTE"
+	INTERVAL_30MIN             = "THIRTY_MINUTE"
+	INTERVAL_1HOUR             = "ONE_HOUR"
+	INTERVAL_1DAY              = "ONE_DAY"
 )

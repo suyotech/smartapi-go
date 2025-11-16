@@ -48,12 +48,12 @@ type CancelOrderRequest struct {
 	OrderID string `json:"orderid"`
 }
 
-type GetOrderBookResponse struct {
+type OrderBook struct {
 	Variety                 string  `json:"variety"`
 	OrderType               string  `json:"ordertype"`
 	ProductType             string  `json:"producttype"`
 	Duration                string  `json:"duration"`
-	Price                   float64 `json:"price"`
+	Price                   float64 `json:"price,string"`
 	TriggerPrice            float64 `json:"triggerprice,string"`
 	Quantity                int64   `json:"quantity,string"`
 	DisclosedQuantity       int64   `json:"disclosedquantity,string"`
@@ -87,7 +87,7 @@ type GetOrderBookResponse struct {
 	ExchangeOrderID         string  `json:"exchangeorderid"`
 }
 
-type TradeBookResponse struct {
+type TradeBook struct {
 	Exchange        string  `json:"exchange"`
 	ProductType     string  `json:"producttype"`
 	TradingSymbol   string  `json:"tradingsymbol"`
@@ -108,8 +108,7 @@ type TradeBookResponse struct {
 	FillTime        string  `json:"filltime"`
 }
 
-type GetPositionsRequest struct {
-}
+
 
 func (c *Client) PlaceOrder(orderReq *PlaceOrderRequest) (*PlaceOrderResponse, error) {
 
@@ -122,33 +121,30 @@ func (c *Client) PlaceOrder(orderReq *PlaceOrderRequest) (*PlaceOrderResponse, e
 	return orderResp, nil
 }
 
-func (c *Client) ModifyOrder(req *ModifyOrderRequest) (*ModifyOrderResponse, error) {
+func (c *Client) ModifyOrder(req *ModifyOrderRequest) (modifyResp *ModifyOrderResponse, err error) {
 
-	var modifyResp = &ModifyOrderResponse{}
+	err = c.doRequest("POST", MODITY_ORDER_ENDPOINT, req, modifyResp)
 
-	err := c.doRequest("POST", MODITY_ORDER_ENDPOINT, req, modifyResp)
-
-	if err != nil {
-		return nil, err
-	}
-	return modifyResp, nil
+	return modifyResp, err
 }
 
-func (c *Client) CancelOrder(req *CancelOrderRequest) error {
+func (c *Client) CancelOrder(req *CancelOrderRequest) (err error) {
 
-	err := c.doRequest("POST", CANCEL_ORDER_ENDPOINT, req, nil)
+	err = c.doRequest("POST", CANCEL_ORDER_ENDPOINT, req, nil)
 
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
-func (c *Client) GetOrderBook() ([]GetOrderBookResponse, error) {
+func (c *Client) GetOrderBook() (orderBook []OrderBook, err error) {
 
-	var orderBook []GetOrderBookResponse
-
-	err := c.doRequest("GET", ORDER_BOOK_ENDPOINT, nil, &orderBook)
+	err = c.doRequest("GET", ORDER_BOOK_ENDPOINT, nil, &orderBook)
 
 	return orderBook, err
+}
+
+func (c *Client) GetTradeBook() (tradeBook []TradeBook, err error) {
+
+	err = c.doRequest("GET", TRADE_BOOK_ENDPOINT, nil, &tradeBook)
+
+	return tradeBook, err
 }
