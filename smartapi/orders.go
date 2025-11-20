@@ -31,8 +31,9 @@ type ModifyOrderRequest struct {
 	OrderType     string  `json:"ordertype"`
 	ProductType   string  `json:"producttype"`
 	Duration      string  `json:"duration"`
-	Price         float64 `json:"price"`
-	Quantity      int     `json:"quantity"`
+	Price         float64 `json:"price,string"`
+	TriggerPrice  float64 `json:"triggerprice,string,omitempty"`
+	Quantity      int     `json:"quantity,string"`
 	TradingSymbol string  `json:"tradingsymbol"`
 	SymbolToken   string  `json:"symboltoken"`
 	Exchange      string  `json:"exchange"`
@@ -53,24 +54,24 @@ type OrderBook struct {
 	OrderType               string  `json:"ordertype"`
 	ProductType             string  `json:"producttype"`
 	Duration                string  `json:"duration"`
-	Price                   float64 `json:"price,string"`
-	TriggerPrice            float64 `json:"triggerprice,string"`
+	Price                   float64 `json:"price"`
+	TriggerPrice            float64 `json:"triggerprice"`
 	Quantity                int64   `json:"quantity,string"`
 	DisclosedQuantity       int64   `json:"disclosedquantity,string"`
-	SquareOff               float64 `json:"squareoff,string"`
-	StopLoss                float64 `json:"stoploss,string"`
-	TrailingStopLoss        float64 `json:"trailingstoploss,string"`
+	SquareOff               float64 `json:"squareoff"`
+	StopLoss                float64 `json:"stoploss"`
+	TrailingStopLoss        float64 `json:"trailingstoploss"`
 	TradingSymbol           string  `json:"tradingsymbol"`
 	TransactionType         string  `json:"transactiontype"`
 	Exchange                string  `json:"exchange"`
 	SymbolToken             string  `json:"symboltoken"`
 	InstrumentType          string  `json:"instrumenttype"`
-	StrikePrice             float64 `json:"strikeprice,string"`
+	StrikePrice             float64 `json:"strikeprice"`
 	OptionType              string  `json:"optiontype"`
 	ExpiryDate              string  `json:"expirydate"`
 	LotSize                 int64   `json:"lotsize,string"`
 	CancelSize              int64   `json:"cancelsize,string"`
-	AveragePrice            float64 `json:"averageprice,string"`
+	AveragePrice            float64 `json:"averageprice"`
 	FilledShares            int64   `json:"filledshares,string"`
 	UnfilledShares          int64   `json:"unfilledshares,string"`
 	OrderID                 string  `json:"orderid"`
@@ -107,8 +108,6 @@ type TradeBook struct {
 	FillID          string  `json:"fillid"`
 	FillTime        string  `json:"filltime"`
 }
-
-
 
 func (c *Client) PlaceOrder(orderReq *PlaceOrderRequest) (*PlaceOrderResponse, error) {
 
@@ -147,4 +146,26 @@ func (c *Client) GetTradeBook() (tradeBook []TradeBook, err error) {
 	err = c.doRequest("GET", TRADE_BOOK_ENDPOINT, nil, &tradeBook)
 
 	return tradeBook, err
+}
+
+func (c *Client) CancelAllOrders() error {
+	orders, err := c.GetOrderBook()
+	if err != nil {
+		return err
+	}
+
+	for _, order := range orders {
+		if !(order.Status == "open" || order.Status == "trigger pending") {
+			continue
+		}
+		cancelReq := &CancelOrderRequest{
+			Variety: VARIETY_NORMAL,
+			OrderID: order.OrderID,
+		}
+		err := c.CancelOrder(cancelReq)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

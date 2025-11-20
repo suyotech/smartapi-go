@@ -115,9 +115,9 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	}
 	defer resp.Body.Close()
 
-	if c.debug {
-		fmt.Printf("[DEBUG] Response Request: %+v\n", resp.Request)
-	}
+	// if c.debug {
+	// 	fmt.Printf("[DEBUG] Response Request: %+v\n", resp.Request)
+	// }
 
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
@@ -130,10 +130,12 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 		fmt.Printf("[DEBUG] Response Body: %s\n", string(respBody))
 	}
 
+	fmt.Printf("Raw server response: %s\n", string(respBody))
+
 	var serverResp serverResponse[json.RawMessage]
 	// Decode into serverResponse wrapper
 	if err := json.Unmarshal(respBody, &serverResp); err != nil {
-		return fmt.Errorf("failed to unmarshal response JSON: %w; raw: %s", err, string(respBody))
+		return fmt.Errorf("failed to unmarshal response JSON: %w; raw: %s \n server resp : %v", err, string(respBody), serverResp)
 	}
 
 	if serverResp.ErrorCode != "" {
@@ -152,7 +154,7 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 
 	// Decode JSON into provided result pointer
 	if err := json.Unmarshal(serverResp.Data, result); err != nil {
-		return fmt.Errorf("failed to unmarshal response JSON: %w; raw: %s", err, string(respBody))
+		return fmt.Errorf("failed to unmarshal response JSON: %w; raw: %s", err, string(serverResp.Data))
 	}
 
 	if c.debug {

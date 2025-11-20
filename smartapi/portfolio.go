@@ -117,3 +117,46 @@ func (c *Client) ConvertPosition(req ConvertPositionRequest) error {
 	err := c.doRequest("POST", CONVERT_POSITION_ENDPOINT, req, nil)
 	return err
 }
+
+func (c *Client) ClosePosition(position Positions) error {
+
+	if position.NetQty == 0 {
+		return nil
+	}
+	var transactionType string
+	if position.NetQty > 0 {
+		transactionType = TRANSACTION_TYPE_SELL
+	}
+	if position.NetQty < 0 {
+		transactionType = TRANSACTION_TYPE_BUY
+	}
+	orderReq := &PlaceOrderRequest{
+		Variety:         VARIETY_NORMAL,
+		Exchange:        position.Exchange,
+		TradingSymbol:   position.TradingSymbol,
+		SymbolToken:     position.SymbolToken,
+		TransactionType: transactionType,
+		OrderType:       ORDER_TYPE_MARKET,
+		ProductType:     position.ProductType,
+		Duration:        DURATION_DAY,
+		Quantity:        int(-position.NetQty),
+	}
+	_, err := c.PlaceOrder(orderReq)
+	return err
+
+}
+
+func (c *Client) CloseAllPositions() error {
+
+	positions, err := c.GetPositions()
+	if err != nil {
+		return err
+	}
+	for _, position := range positions {
+		err := c.ClosePosition(position)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
