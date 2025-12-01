@@ -130,8 +130,6 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 		fmt.Printf("[DEBUG] Response Body: %s\n", string(respBody))
 	}
 
-	fmt.Printf("Raw server response: %s\n", string(respBody))
-
 	var serverResp serverResponse[json.RawMessage]
 	// Decode into serverResponse wrapper
 	if err := json.Unmarshal(respBody, &serverResp); err != nil {

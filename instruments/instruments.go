@@ -182,9 +182,9 @@ func FindInstruments(req FindInstrumentRequest, instruments []Instrument) ([]Ins
 }
 
 type OptionStrikes struct {
-	NEAR float64   `json:"near"`
-	UP   []float64 `json:"up"`
-	DOWN []float64 `json:"down"`
+	NEAR string   `json:"near"`
+	UP   []string `json:"up"`
+	DOWN []string `json:"down"`
 }
 
 func GetOptionStrikes(price float64, req FindInstrumentRequest, maxStrikes int, instruments []Instrument) (strikes OptionStrikes, err error) {
@@ -229,19 +229,16 @@ func GetOptionStrikes(price float64, req FindInstrumentRequest, maxStrikes int, 
 		}
 	}
 
-	strikes.NEAR = nearestStrike
-
-	strikes.UP = []float64{}
-	strikes.DOWN = []float64{}
+	strikes.NEAR = floattostring(nearestStrike * 100)
 
 	// Collect maxStrikes strikes above and below nearestStrike
-	strikes.UP = []float64{}
-	strikes.DOWN = []float64{}
+	strikes.UP = []string{}
+	strikes.DOWN = []string{}
 
 	//Collect up strikes
 	for _, strike := range strikeValues {
 		if strike > nearestStrike && len(strikes.UP) < maxStrikes {
-			strikes.UP = append(strikes.UP, strike)
+			strikes.UP = append(strikes.UP, floattostring(strike*100))
 		}
 	}
 
@@ -249,11 +246,15 @@ func GetOptionStrikes(price float64, req FindInstrumentRequest, maxStrikes int, 
 	for i := len(strikeValues) - 1; i >= 0; i-- {
 		strike := strikeValues[i]
 		if strike < nearestStrike && len(strikes.DOWN) < maxStrikes {
-			strikes.DOWN = append(strikes.DOWN, strike)
+			strikes.DOWN = append(strikes.DOWN, floattostring(strike*100))
 		}
 	}
 
 	return strikes, nil
+}
+
+func floattostring(num float64) string {
+	return strconv.FormatFloat(num, 'f', -1, 64)
 }
 
 func GetExpiryDates(req FindInstrumentRequest, instruments []Instrument) ([]string, error) {
