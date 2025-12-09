@@ -112,7 +112,7 @@ func (s *SmartAPIWS) SetHeartBeat() {
 					if err := s.socket.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
 						log.Println("Ping error:", err)
 					}
-					log.Println("Heartbeat ping sent")
+					
 				}
 			case <-s.heartbeatChannel:
 				log.Println("Heartbeat stopped")
