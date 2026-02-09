@@ -4,23 +4,23 @@ import "time"
 
 //Endpoints constants
 const (
-	BASE_URL              = "https://apiconnect.angelone.in"
-	REQUEST_TIMEOUT       = 30 * time.Second
-	LOGIN_ENDPOINT        = "/rest/auth/angelbroking/user/v1/loginByPassword"
-	USER_PROFILE_ENDPOINT = "/rest/secure/angelbroking/user/v1/getProfile"
-	MARGIN_ENDPOINT       = "/rest/secure/angelbroking/user/v1/getRMS"
-	LOGOUT_ENDPOINT       = "/rest/secure/angelbroking/user/v1/logout"
-	PLACE_ORDER_ENDPOINT  = "/rest/secure/angelbroking/order/v1/placeOrder"
-	MODITY_ORDER_ENDPOINT = "/rest/secure/angelbroking/order/v1/modifyOrder"
-	CANCEL_ORDER_ENDPOINT = "/rest/secure/angelbroking/order/v1/cancelOrder"
-	ORDER_BOOK_ENDPOINT   = "/rest/secure/angelbroking/order/v1/getOrderBook"
-	TRADE_BOOK_ENDPOINT   = "/rest/secure/angelbroking/order/v1/getTradeBook"
-	POSITIONS_ENDPOINT    = "/rest/secure/angelbroking/order/v1/getPosition"
-	HOLDINGS_ENDPOINT     = "/rest/secure/angelbroking/portfolio/v1/getAllHolding"
-	ALLHOLDINGS_ENDPOINT  = "/rest/secure/angelbroking/portfolio/v1/getAllHolding"
-
+	BASE_URL                  = "https://apiconnect.angelone.in"
+	REQUEST_TIMEOUT           = 30 * time.Second
+	LOGIN_ENDPOINT            = "/rest/auth/angelbroking/user/v1/loginByPassword"
+	USER_PROFILE_ENDPOINT     = "/rest/secure/angelbroking/user/v1/getProfile"
+	MARGIN_ENDPOINT           = "/rest/secure/angelbroking/user/v1/getRMS"
+	LOGOUT_ENDPOINT           = "/rest/secure/angelbroking/user/v1/logout"
+	PLACE_ORDER_ENDPOINT      = "/rest/secure/angelbroking/order/v1/placeOrder"
+	MODITY_ORDER_ENDPOINT     = "/rest/secure/angelbroking/order/v1/modifyOrder"
+	CANCEL_ORDER_ENDPOINT     = "/rest/secure/angelbroking/order/v1/cancelOrder"
+	ORDER_BOOK_ENDPOINT       = "/rest/secure/angelbroking/order/v1/getOrderBook"
+	TRADE_BOOK_ENDPOINT       = "/rest/secure/angelbroking/order/v1/getTradeBook"
+	POSITIONS_ENDPOINT        = "/rest/secure/angelbroking/order/v1/getPosition"
+	HOLDINGS_ENDPOINT         = "/rest/secure/angelbroking/portfolio/v1/getAllHolding"
+	ALLHOLDINGS_ENDPOINT      = "/rest/secure/angelbroking/portfolio/v1/getAllHolding"
 	CONVERT_POSITION_ENDPOINT = "/rest/secure/angelbroking/portfolio/v1/convertPosition"
 	CANDLE_DATA_ENDPOINT      = "/rest/secure/angelbroking/historical/v1/getCandleData"
+	OPTION_GREEKS_ENDPOINT    = "/rest/secure/angelbroking/marketData/v1/optionGreek"
 )
 
 //Order related constants

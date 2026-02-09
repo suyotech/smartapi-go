@@ -58,3 +58,35 @@ func (c *Client) GetCandleData(req *CandleDataRequest) ([]Candle, error) {
 	}
 	return candleData, nil
 }
+
+type OptionGreek struct {
+	Name        string  `json:"name"`
+	Expiry      string  `json:"expiry"`
+	StrikePrice float64 `json:"strikePrice,string"`
+	Optiontype  string  `json:"optionType"`
+	Delta       float64 `json:"delta,string"`
+	Gamma       float64 `json:"gamma,string"`
+	Theta       float64 `json:"theta,string"`
+	Vega        float64 `json:"vega,string"`
+	IV          float64 `json:"impliedVolatility,string"`
+	TradeVolume float64 `json:"tradeVolume,string"`
+}
+
+func (c *Client) GetOptionGreeks(name string, expirydate string) ([]OptionGreek, error) {
+
+	req := struct {
+		Name       string `json:"name"`
+		ExpiryDate string `json:"expirydate"`
+	}{
+		Name:       name,
+		ExpiryDate: expirydate,
+	}
+
+	var result []OptionGreek
+	err := c.doRequest("POST", OPTION_GREEKS_ENDPOINT, req, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
