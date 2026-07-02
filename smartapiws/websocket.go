@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -23,6 +24,7 @@ const (
 )
 
 type SmartAPIWS struct {
+	mu                sync.Mutex
 	clientid          string
 	apikey            string
 	jwttoken          string
@@ -33,6 +35,8 @@ type SmartAPIWS struct {
 	retryInterval     int // in seconds
 	heartbeatChannel  chan struct{}
 	onDataCallback    func(TickData)
+	closed            bool
+	reconnecting      bool
 }
 
 func NewWSClient(clientid, apikey, jwttoken, feedtoken string) (*SmartAPIWS, error) {
@@ -51,6 +55,12 @@ func NewWSClient(clientid, apikey, jwttoken, feedtoken string) (*SmartAPIWS, err
 }
 
 func (s *SmartAPIWS) Connect() error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return fmt.Errorf("websocket is closed")
+	}
+	s.mu.Unlock()
 
 	endpoint := url.URL{Scheme: "wss", Host: "smartapisocket.angelone.in", Path: "/smart-stream"}
 	header := http.Header{}
@@ -66,16 +76,28 @@ func (s *SmartAPIWS) Connect() error {
 
 	errorMessage := resp.Header.Get("x-error-message")
 	if errorMessage != "" {
+		socket.Close()
 		return fmt.Errorf("websocket connection error: %s", errorMessage)
 	}
 
-	s.socket = socket
-
-	// reset old heartbeat goroutine
-	if s.heartbeatChannel != nil {
-		close(s.heartbeatChannel)
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		socket.Close()
+		return fmt.Errorf("websocket is closed")
 	}
+	oldSocket := s.socket
+	oldHeartbeat := s.heartbeatChannel
+	s.socket = socket
 	s.heartbeatChannel = make(chan struct{})
+	s.mu.Unlock()
+
+	if oldHeartbeat != nil {
+		close(oldHeartbeat)
+	}
+	if oldSocket != nil {
+		oldSocket.Close()
+	}
 
 	log.Println("Socket Connected Successfully")
 
@@ -87,34 +109,61 @@ func (s *SmartAPIWS) Connect() error {
 }
 
 func (s *SmartAPIWS) Close() error {
-	if s.socket != nil {
-		close(s.heartbeatChannel) // stop ping goroutine
-		err := s.socket.Close()
-		s.socket = nil
-		return err
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+
+	s.closed = true
+	s.reconnecting = false
+	socket := s.socket
+	heartbeatChannel := s.heartbeatChannel
+	s.socket = nil
+	s.heartbeatChannel = nil
+	s.mu.Unlock()
+
+	if heartbeatChannel != nil {
+		close(heartbeatChannel)
+	}
+	if socket != nil {
+		return socket.Close()
 	}
 	return nil
 }
 
 func (s *SmartAPIWS) SetHeartBeat() {
-	if s.socket == nil {
+	s.mu.Lock()
+	socket := s.socket
+	heartbeatChannel := s.heartbeatChannel
+	heartbeatInterval := s.heartbeatInterval
+	closed := s.closed
+	s.mu.Unlock()
+
+	if closed || socket == nil || heartbeatChannel == nil {
 		return
 	}
 
 	go func() {
-		ticker := time.NewTicker(time.Duration(s.heartbeatInterval) * time.Second)
+		ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
-				if s.socket != nil {
-					if err := s.socket.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
-						log.Println("Ping error:", err)
-					}
-					
+				s.mu.Lock()
+				currentSocket := s.socket
+				isCurrentSocket := currentSocket == socket
+				closed := s.closed
+				s.mu.Unlock()
+
+				if closed || !isCurrentSocket {
+					return
 				}
-			case <-s.heartbeatChannel:
+				if err := socket.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
+					log.Println("Ping error:", err)
+				}
+			case <-heartbeatChannel:
 				log.Println("Heartbeat stopped")
 				return
 			}
@@ -127,9 +176,18 @@ func (s *SmartAPIWS) SetOnData(handler func(TickData)) {
 }
 
 func (s *SmartAPIWS) ReadLoop() {
+	s.mu.Lock()
+	socket := s.socket
+	closed := s.closed
+	s.mu.Unlock()
+
+	if closed || socket == nil {
+		return
+	}
+
 	go func() {
 		for {
-			mt, msg, err := s.socket.ReadMessage()
+			mt, msg, err := socket.ReadMessage()
 			if err != nil {
 				log.Println("Read error:", err)
 				go s.Reconnect()
@@ -158,7 +216,28 @@ func (s *SmartAPIWS) ReadLoop() {
 }
 
 func (s *SmartAPIWS) Reconnect() {
+	s.mu.Lock()
+	if s.closed || s.reconnecting {
+		s.mu.Unlock()
+		return
+	}
+	s.reconnecting = true
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		s.reconnecting = false
+		s.mu.Unlock()
+	}()
+
 	for i := 0; i < s.retryCount; i++ {
+		s.mu.Lock()
+		closed := s.closed
+		s.mu.Unlock()
+		if closed {
+			return
+		}
+
 		log.Println("Reconnecting...", i+1)
 		if err := s.Connect(); err == nil {
 			log.Println("Reconnected!")
@@ -174,13 +253,25 @@ func (s *SmartAPIWS) Reconnect() {
 }
 
 func (s *SmartAPIWS) SendMessage(messageType int, data []byte) error {
-	if s.socket == nil {
+	s.mu.Lock()
+	socket := s.socket
+	closed := s.closed
+	s.mu.Unlock()
+
+	if closed || socket == nil {
 		return fmt.Errorf("socket is not connected")
 	}
-	return s.socket.WriteMessage(messageType, data)
+	return socket.WriteMessage(messageType, data)
 }
 
 func (s *SmartAPIWS) Subscribe(instruments []instruments.Instrument) error {
+	s.mu.Lock()
+	closed := s.closed
+	socket := s.socket
+	s.mu.Unlock()
+	if closed || socket == nil {
+		return fmt.Errorf("socket is not connected")
+	}
 
 	cm := buildSubscribeContract(instruments)
 	jsonData, err := json.Marshal(cm)
