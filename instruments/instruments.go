@@ -42,7 +42,8 @@ func DownloadInstruments() error {
 }
 
 func DownloadInstrumentsAt(filePath string) error {
-	resp, err := http.Get("https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json")
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Get("https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json")
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func DownloadInstrumentsAt(filePath string) error {
 		return err
 	}
 
-	return os.Rename(tempPath, filePath)
+	return replaceFile(tempPath, filePath)
 }
 
 // CheckInstrumentsUpdate checks instruments.json against the latest 8:30 AM IST cutoff.
