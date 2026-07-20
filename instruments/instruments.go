@@ -2,10 +2,12 @@ package instruments
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +38,10 @@ const (
 )
 
 func DownloadInstruments() error {
+	return DownloadInstrumentsAt("instruments.json")
+}
+
+func DownloadInstrumentsAt(filePath string) error {
 	resp, err := http.Get("https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json")
 	if err != nil {
 		return err
@@ -43,57 +49,91 @@ func DownloadInstruments() error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return err
+		return fmt.Errorf("download instruments: unexpected HTTP status %s", resp.Status)
 	}
 
-	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	// Optionally, validate JSON
 	var instruments []Instrument
 	if err := json.Unmarshal(body, &instruments); err != nil {
 		return err
 	}
+	if len(instruments) == 0 {
+		return fmt.Errorf("download instruments: empty instrument list")
+	}
 
-	// Save to file
-	return os.WriteFile("instruments.json", body, 0644)
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	temp, err := os.CreateTemp(dir, ".instruments-*.json")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+
+	if err := temp.Chmod(0644); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.Write(body); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tempPath, filePath)
 }
 
-// CheckInstrumentsUpdate checks if instruments.json was modified before today 8:30 AM IST.
-// If yes, it downloads a new file.
+// CheckInstrumentsUpdate checks instruments.json against the latest 8:30 AM IST cutoff.
 func CheckInstrumentsUpdate() error {
-	const fileName = "instruments.json"
+	return CheckInstrumentsUpdateAt("instruments.json")
+}
 
+func CheckInstrumentsUpdateAt(filePath string) error {
 	loc, err := time.LoadLocation("Asia/Kolkata")
 	if err != nil {
 		return err
 	}
 
 	now := time.Now().In(loc)
-	today830 := time.Date(now.Year(), now.Month(), now.Day(), 8, 30, 0, 0, loc)
+	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 8, 30, 0, 0, loc)
+	if now.Before(cutoff) {
+		cutoff = cutoff.AddDate(0, 0, -1)
+	}
 
-	info, err := os.Stat(fileName)
+	info, err := os.Stat(filePath)
 	if err != nil {
-		// If file does not exist, download it
 		if os.IsNotExist(err) {
-			return DownloadInstruments()
+			return DownloadInstrumentsAt(filePath)
 		}
 		return err
 	}
 
-	modTime := info.ModTime().In(loc)
-	if modTime.Before(today830) {
-		return DownloadInstruments()
+	if _, err := LoadInstrumentsAt(filePath); err != nil || info.ModTime().In(loc).Before(cutoff) {
+		return DownloadInstrumentsAt(filePath)
 	}
 
 	return nil
 }
 
 func LoadInstruments() ([]Instrument, error) {
-	data, err := os.ReadFile("instruments.json")
+	return LoadInstrumentsAt("instruments.json")
+}
+
+func LoadInstrumentsAt(filePath string) ([]Instrument, error) {
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +141,9 @@ func LoadInstruments() ([]Instrument, error) {
 	var instruments []Instrument
 	if err := json.Unmarshal(data, &instruments); err != nil {
 		return nil, err
+	}
+	if len(instruments) == 0 {
+		return nil, fmt.Errorf("load instruments: empty instrument list")
 	}
 
 	return instruments, nil
