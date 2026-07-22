@@ -1,5 +1,33 @@
 package smartapi
 
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+var ErrRateLimited = errors.New("SmartAPI rate limit exceeded")
+
+type HTTPError struct {
+	StatusCode int
+	Message    string
+	RawBody    string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("SmartAPI HTTP %d: %s", e.StatusCode, e.Message)
+}
+
+func (e *HTTPError) Unwrap() error {
+	text := strings.ToLower(e.Message + " " + e.RawBody)
+	if strings.Contains(text, "access denied because of exceeding access rate") ||
+		strings.Contains(text, "too many requests") ||
+		strings.Contains(text, "ab1021") {
+		return ErrRateLimited
+	}
+	return nil
+}
+
 var apiErrorMessages = map[string]string{
 	"AG8001": "Invalid Token",
 	"AG8002": "Token Expired",

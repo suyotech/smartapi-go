@@ -130,6 +130,10 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 		fmt.Printf("[DEBUG] Response Body: %s\n", string(respBody))
 	}
 
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return newHTTPError(resp.StatusCode, respBody)
+	}
+
 	var serverResp serverResponse[json.RawMessage]
 	// Decode into serverResponse wrapper
 	if err := json.Unmarshal(respBody, &serverResp); err != nil {
@@ -137,6 +141,13 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	}
 
 	if serverResp.ErrorCode != "" {
+		if serverResp.ErrorCode == "AB1021" {
+			return &HTTPError{
+				StatusCode: resp.StatusCode,
+				Message:    serverResp.Message,
+				RawBody:    string(respBody),
+			}
+		}
 		return fmt.Errorf("API error: %s (code: %s : %s)", serverResp.Message, serverResp.ErrorCode, getAPIErrorMessage(serverResp.ErrorCode))
 	}
 
@@ -160,4 +171,23 @@ func (c *Client) doRequest(method string, path string, body any, result any) err
 	}
 
 	return nil
+}
+
+func newHTTPError(statusCode int, body []byte) *HTTPError {
+	rawBody := string(body)
+	message := string(bytes.TrimSpace(body))
+
+	var serverResp serverResponse[json.RawMessage]
+	if json.Unmarshal(body, &serverResp) == nil && serverResp.Message != "" {
+		message = serverResp.Message
+	}
+	if message == "" {
+		message = http.StatusText(statusCode)
+	}
+
+	return &HTTPError{
+		StatusCode: statusCode,
+		Message:    message,
+		RawBody:    rawBody,
+	}
 }
