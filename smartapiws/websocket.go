@@ -1,11 +1,16 @@
 package smartapiws
 
 import (
+	"bufio"
 	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -37,9 +42,11 @@ type SmartAPIWS struct {
 	onDataCallback    func(TickData)
 	closed            bool
 	reconnecting      bool
+	dialer            websocket.Dialer
 }
 
 func NewWSClient(clientid, apikey, jwttoken, feedtoken string) (*SmartAPIWS, error) {
+	dialer := *websocket.DefaultDialer
 
 	return &SmartAPIWS{
 		clientid:          clientid,
@@ -51,7 +58,87 @@ func NewWSClient(clientid, apikey, jwttoken, feedtoken string) (*SmartAPIWS, err
 		retryInterval:     5,
 		socket:            nil,
 		heartbeatChannel:  make(chan struct{}),
+		dialer:            dialer,
 	}, nil
+}
+
+// SetProxy configures an optional proxy for this WebSocket client only.
+// Pass an empty string to use a direct connection.
+func (s *SmartAPIWS) SetProxy(proxyURL string) error {
+	var proxy func(*http.Request) (*url.URL, error)
+	var netDialContext func(context.Context, string, string) (net.Conn, error)
+
+	if proxyURL != "" {
+		parsed, err := url.Parse(proxyURL)
+		if err != nil || parsed.Host == "" {
+			return fmt.Errorf("invalid proxy URL %q", proxyURL)
+		}
+		switch parsed.Scheme {
+		case "http":
+			proxy = http.ProxyURL(parsed)
+		case "https":
+			netDialContext = httpsProxyDialContext(parsed)
+		default:
+			return fmt.Errorf("unsupported websocket proxy scheme %q", parsed.Scheme)
+		}
+	}
+
+	s.mu.Lock()
+	s.dialer.Proxy = proxy
+	s.dialer.NetDialContext = netDialContext
+	s.mu.Unlock()
+	return nil
+}
+
+func httpsProxyDialContext(proxyURL *url.URL) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		proxyAddress := proxyURL.Host
+		if proxyURL.Port() == "" {
+			proxyAddress = net.JoinHostPort(proxyURL.Hostname(), "443")
+		}
+		dialer := tls.Dialer{Config: &tls.Config{ServerName: proxyURL.Hostname()}}
+		conn, err := dialer.DialContext(ctx, network, proxyAddress)
+		if err != nil {
+			return nil, err
+		}
+		if deadline, ok := ctx.Deadline(); ok {
+			if err := conn.SetDeadline(deadline); err != nil {
+				conn.Close()
+				return nil, err
+			}
+		}
+
+		header := make(http.Header)
+		if proxyURL.User != nil {
+			password, _ := proxyURL.User.Password()
+			credentials := proxyURL.User.Username() + ":" + password
+			header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(credentials)))
+		}
+		request := &http.Request{
+			Method: http.MethodConnect,
+			URL:    &url.URL{Opaque: address},
+			Host:   address,
+			Header: header,
+		}
+		if err := request.Write(conn); err != nil {
+			conn.Close()
+			return nil, err
+		}
+		response, err := http.ReadResponse(bufio.NewReader(conn), request)
+		if err != nil {
+			conn.Close()
+			return nil, err
+		}
+		if response.StatusCode != http.StatusOK {
+			conn.Close()
+			return nil, fmt.Errorf("proxy CONNECT failed: %s", response.Status)
+		}
+		if err := conn.SetDeadline(time.Time{}); err != nil {
+			conn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}
 }
 
 func (s *SmartAPIWS) Connect() error {
@@ -60,6 +147,7 @@ func (s *SmartAPIWS) Connect() error {
 		s.mu.Unlock()
 		return fmt.Errorf("websocket is closed")
 	}
+	dialer := s.dialer
 	s.mu.Unlock()
 
 	endpoint := url.URL{Scheme: "wss", Host: "smartapisocket.angelone.in", Path: "/smart-stream"}
@@ -69,7 +157,7 @@ func (s *SmartAPIWS) Connect() error {
 	header.Set("x-client-code", s.clientid)
 	header.Set("x-feed-token", s.feedtoken)
 
-	socket, resp, err := websocket.DefaultDialer.Dial(endpoint.String(), header)
+	socket, resp, err := dialer.Dial(endpoint.String(), header)
 	if err != nil {
 		return err
 	}

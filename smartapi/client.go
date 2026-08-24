@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type Client struct {
@@ -56,6 +57,32 @@ type serverResponse[T any] struct {
 
 func (c *Client) SetDebug(debug bool) {
 	c.debug = debug
+}
+
+// SetProxy configures an optional proxy for this client only.
+// Pass an empty string to use a direct connection.
+func (c *Client) SetProxy(proxyURL string) error {
+	var proxy func(*http.Request) (*url.URL, error)
+	if proxyURL != "" {
+		parsed, err := url.Parse(proxyURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("invalid proxy URL %q", proxyURL)
+		}
+		proxy = http.ProxyURL(parsed)
+	}
+
+	var transport *http.Transport
+	switch current := c.httpClient.Transport.(type) {
+	case nil:
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	case *http.Transport:
+		transport = current.Clone()
+	default:
+		return fmt.Errorf("cannot set proxy on a custom HTTP transport")
+	}
+	transport.Proxy = proxy
+	c.httpClient.Transport = transport
+	return nil
 }
 
 func (c *Client) doRequest(method string, path string, body any, result any) error {
